@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camp Scoreboard Live</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        
+        .font-display {
+            font-family: 'Fredoka', cursive, sans-serif;
+        }
+
+        .gold-glow {
+            box-shadow: 0 0 25px rgba(234, 179, 8, 0.4);
+        }
+        
+        .silver-glow {
+            box-shadow: 0 0 15px rgba(148, 163, 184, 0.3);
+        }
+
+        .bronze-glow {
+            box-shadow: 0 0 15px rgba(217, 119, 6, 0.3);
+        }
+
+        /* Custom Scrollbar */
+        ::-webk ik it-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.5);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 pb-12 flex flex-col">
+
+    <!-- Navigation / Header -->
+    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 py-3">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-xl font-bold shadow-inner">
+                    <i class="fa-solid fa-campground"></i>
+                </div>
+                <div>
+                    <h1 id="camp-title-display" class="font-display text-xl sm:text-2xl font-bold tracking-wide text-amber-400">
+                        CAMP ARENA SCOREBOARD
+                    </h1>
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span> LIVE
+                        </span>
+                        <span id="sync-status" class="text-xs text-slate-400 hidden sm:inline">Connecting...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Header Action Controls -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <button id="admin-toggle-btn" class="px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all duration-200 flex items-center gap-2 bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200">
+                    <i class="fa-solid fa-lock text-amber-400"></i>
+                    <span id="admin-btn-text" class="hidden sm:inline">Admin Access</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-6 w-full flex-1 flex flex-col gap-8">
+
+        <!-- Banner / Status Message -->
+        <div id="admin-indicator" class="hidden bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-amber-300">
+            <div class="flex items-center gap-3 text-sm sm:text-base">
+                <i class="fa-solid fa-user-shield text-xl"></i>
+                <div>
+                    <span class="font-bold">Admin Mode Active!</span> You have permission to update team scores, rename teams, and reset scores.
+                </div>
+            </div>
+            <button id="edit-camp-title-btn" class="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                <i class="fa-solid fa-pen mr-1"></i> Rename Camp
+            </button>
+        </div>
+
+        <section>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-display text-2xl font-bold tracking-wide flex items-center gap-2 text-slate-200">
+                    <i class="fa-solid fa-trophy text-amber-400"></i> Leaderboard Standings
+                </h2>
+                <span class="text-xs text-slate-400">Real-time dynamic ranking</span>
+            </div>
+
+            <!-- Dynamic Teams Grid -->
+            <div id="teams-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Team Cards rendered dynamically via JS -->
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Quick Bonus Points Form (Admin Only) -->
+            <div id="quick-bonus-panel" class="hidden lg:block bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col gap-4">
+                <h3 class="font-display text-lg font-bold text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> Quick Award
+                </h3>
+                <form id="bonus-form" class="flex flex-col gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Select Team</label>
+                        <select id="bonus-team-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Points (+/-)</label>
+                        <input type="number" id="bonus-points" placeholder="e.g. 25 or -10" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Reason / Challenge Name</label>
+                        <input type="text" id="bonus-reason" placeholder="e.g. Tug of War Winner" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500">
+                    </div>
+                    <button type="submit" class="mt-2 w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 px-4 rounded-xl shadow-lg transition-all text-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus-circle"></i> Award Points
+                    </button>
+                </form>
+            </div>
+
+            <!-- Activity Log Stream -->
+            <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col h-[380px]">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-display text-lg font-bold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-indigo-400"></i> Score History & Activity Log
+                    </h3>
+                    <span id="log-count" class="text-xs bg-slate-800 px-2.5 py-1 rounded-full text-slate-400">0 events</span>
+                </div>
+                
+                <div id="activity-log" class="flex-1 overflow-y-auto space-y-2 pr-1">
+                    <div class="text-center py-12 text-slate-500 text-sm">
+                        <i class="fa-solid fa-ghost text-2xl mb-2"></i>
+                        <p>No activity logged yet today!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Admin Passcode Modal -->
+    <div id="passcode-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative">
+            <button id="close-passcode-modal" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="text-center mb-6">
+                <div class="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-3 text-xl">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <h3 class="font-display text-xl font-bold text-slate-100">Admin Authorization</h3>
+                <p class="text-xs text-slate-400 mt-1">Enter PIN code to manage scores</p>
+            </div>
+            <form id="passcode-form" class="space-y-4">
+                <div>
+                    <input type="password" id="passcode-input" maxlength="6" placeholder="Enter PIN (Default: 1234)" autofocus class="w-full text-center tracking-widest text-xl bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-amber-500">
+                    <p id="passcode-error" class="text-xs text-rose-400 mt-2 text-center hidden">Incorrect passcode! Try again.</p>
+                </div>
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl transition-colors">
+                    Unlock Admin Tools
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Custom Point Modal (for quick team adjustments) -->
+    <div id="custom-point-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative">
+            <button id="close-point-modal" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="text-center mb-4">
+                <h3 id="point-modal-title" class="font-display text-xl font-bold text-slate-100">Adjust Team Points</h3>
+                <p id="point-modal-subtitle" class="text-xs text-slate-400 mt-1">Add or subtract custom amount</p>
+            </div>
+            <form id="custom-point-form" class="space-y-3">
+                <input type="hidden" id="modal-team-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Point Delta (+ or -)</label>
+                    <input type="number" id="modal-points-delta" placeholder="e.g. 50 or -20" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 text-center font-bold text-lg focus:outline-none focus:border-amber-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Activity / Reason</label>
+                    <input type="text" id="modal-points-reason" placeholder="e.g. Cabin Cleanup Victory" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl transition-colors text-sm">
+                    Confirm Adjustment
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Rename Camp Modal -->
+    <div id="rename-camp-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative">
+            <button id="close-rename-modal" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="text-center mb-4">
+                <h3 class="font-display text-xl font-bold text-slate-100">Rename Camp</h3>
+                <p class="text-xs text-slate-400 mt-1">Update global scoreboard title</p>
+            </div>
+            <form id="rename-camp-form" class="space-y-3">
+                <input type="text" id="new-camp-title-input" placeholder="e.g. CAMP OAKWOOD 2026" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2.5 rounded-xl transition-colors text-sm">
+                    Save New Title
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Custom Toast Message -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 border border-slate-700 text-slate-100 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <i id="toast-icon" class="fa-solid fa-circle-info text-amber-400 text-lg"></i>
+        <span id="toast-message" class="text-sm font-semibold">Message text...</span>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Configurations & Default Teams Data
+        const ADMIN_PIN = "1234";
+        const DEFAULT_TEAMS = [
+            { id: "team1", name: "Red Falcons", score: 100, color: "red", bgClass: "bg-red-500", borderClass: "border-red-500/40", textClass: "text-red-400", icon: "fa-hawk" },
+            { id: "team2", name: "Blue Sharks", score: 85, color: "blue", bgClass: "bg-blue-500", borderClass: "border-blue-500/40", textClass: "text-blue-400", icon: "fa-fish font-sharp" },
+            { id: "team3", name: "Green Eagles", score: 120, color: "emerald", bgClass: "bg-emerald-500", borderClass: "border-emerald-500/40", textClass: "text-emerald-400", icon: "fa-feather" },
+            { id: "team4", name: "Gold Lions", score: 95, color: "amber", bgClass: "bg-amber-500", borderClass: "border-amber-500/40", textClass: "text-amber-400", icon: "fa-cat" }
+        ];
+
+        // State variables
+        let isAdmin = false;
+        let db = null;
+        let auth = null;
+        let currentLeaderId = null;
+        let localState = {
+            title: "CAMP ARENA SCOREBOARD",
+            teams: DEFAULT_TEAMS,
+            logs: []
+        };
+
+        // Firebase Setup
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'camp-scoreboard-v1';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "demo-api-key",
+            authDomain: "demo-project.firebaseapp.com",
+            projectId: "demo-project",
+            storageBucket: "demo-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:123456789"
+        };
+
+        // Helper UI elements
+        const syncStatusEl = document.getElementById('sync-status');
+        const adminToggleBtn = document.getElementById('admin-toggle-btn');
+        const adminBtnText = document.getElementById('admin-btn-text');
+        const adminIndicator = document.getElementById('admin-indicator');
+        const teamsContainer = document.getElementById('teams-container');
+        const activityLogContainer = document.getElementById('activity-log');
+        const bonusTeamSelect = document.getElementById('bonus-team-select');
+
+        async function initFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Auth step according to mandated rule
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                syncStatusEl.innerText = "Connected";
+                syncStatusEl.classList.remove('text-slate-400');
+                syncStatusEl.classList.add('text-emerald-400');
+
+                // Listen to main doc in Public path
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'scoreboard', 'main');
+                
+                onSnapshot(docRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const data = snapshot.data();
+                        updateLocalState(data);
+                    } else {
+                        // Seed initial document if absent
+                        const initialPayload = {
+                            title: "CAMP ARENA SCOREBOARD",
+                            teams: DEFAULT_TEAMS,
+                            logs: [{
+                                id: Date.now(),
+                                text: "Scoreboard live stream started!",
+                                teamName: "System",
+                                points: 0,
+                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            }]
+                        };
+                        setDoc(docRef, initialPayload);
+                    }
+                }, (error) => {
+                    console.error("Firestore sync error:", error);
+                    syncStatusEl.innerText = "Offline Mode";
+                    syncStatusEl.classList.add('text-amber-400');
+                });
+
+            } catch (err) {
+                console.warn("Fallback to Local Memory mode:", err);
+                syncStatusEl.innerText = "Local Mode";
+                renderApp();
+            }
+        }
+
+        function updateLocalState(newData) {
+            const oldLeader = getLeaderId(localState.teams);
+            localState = newData;
+            const newLeader = getLeaderId(localState.teams);
+
+            // Trigger confetti if leader changes
+            if (oldLeader && newLeader && oldLeader !== newLeader) {
+                triggerConfetti();
+                showToast(`🏆 ${getTeamName(newLeader)} took 1st Place!`, 'gold');
+            }
+
+            renderApp();
+        }
+
+        function getLeaderId(teams) {
+            if (!teams || teams.length === 0) return null;
+            const sorted = [...teams].sort((a, b) => b.score - a.score);
+            return sorted[0].id;
+        }
+
+        function getTeamName(teamId) {
+            const team = localState.teams.find(t => t.id === teamId);
+            return team ? team.name : "A Team";
+        }
+
+        function renderApp() {
+            // Update Title
+            document.getElementById('camp-title-display').innerText = localState.title || "CAMP ARENA SCOREBOARD";
+
+            // Sort teams for rank assignment
+            const sortedTeams = [...localState.teams].sort((a, b) => b.score - a.score);
+            const rankMap = {};
+            sortedTeams.forEach((team, index) => {
+                rankMap[team.id] = index + 1;
+            });
+
+            // Populate Teams Cards
+            teamsContainer.innerHTML = '';
+            localState.teams.forEach(team => {
+                const rank = rankMap[team.id];
+                const card = createTeamCard(team, rank);
+                teamsContainer.appendChild(card);
+            });
+
+            // Populate Bonus Select
+            bonusTeamSelect.innerHTML = localState.teams.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
+            // Render Logs
+            renderLogs();
+        }
+
+        function createTeamCard(team, rank) {
+            const card = document.createElement('div');
+            
+            // Rank Glow / Styling
+            let rankBadge = '';
+            let borderStyle = 'border-slate-800 bg-slate-900';
+            
+            if (rank === 1) {
+                rankBadge = '<span class="bg-amber-500 text-slate-950 font-bold text-xs px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1"><i class="fa-solid fa-crown"></i> 1st</span>';
+                borderStyle = 'border-amber-500/50 bg-slate-900/90 gold-glow';
+            } else if (rank === 2) {
+                rankBadge = '<span class="bg-slate-300 text-slate-950 font-bold text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><i class="fa-solid fa-medal"></i> 2nd</span>';
+                borderStyle = 'border-slate-400/40 bg-slate-900/80 silver-glow';
+            } else if (rank === 3) {
+                rankBadge = '<span class="bg-amber-700 text-amber-100 font-bold text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><i class="fa-solid fa-award"></i> 3rd</span>';
+                borderStyle = 'border-amber-800/40 bg-slate-900/80 bronze-glow';
+            } else {
+                rankBadge = `<span class="bg-slate-800 text-slate-400 font-bold text-xs px-2 py-0.5 rounded-full">${rank}th</span>`;
+            }
+
+            card.className = `border rounded-2xl p-5 flex flex-col justify-between transition-all duration-300 relative overflow-hidden ${borderStyle}`;
+            
+            card.innerHTML = `
+                <div class="flex items-center justify-between mb-3">
+                    ${rankBadge}
+                    ${isAdmin ? `
+                        <button class="rename-team-btn text-xs text-slate-400 hover:text-amber-400 transition-colors" data-id="${team.id}">
+                            <i class="fa-solid fa-pen"></i> Edit Name
+                        </button>
+                    ` : ''}
+                </div>
+
+                <div class="text-center my-2">
+                    <div class="w-12 h-12 rounded-2xl ${team.bgClass}/20 border ${team.borderClass} ${team.textClass} flex items-center justify-center mx-auto mb-2 text-2xl">
+                        <i class="fa-solid ${team.icon || 'fa-shield-halved'}"></i>
+                    </div>
+                    <h3 class="font-display text-xl font-bold text-slate-100 truncate">${team.name}</h3>
+                    <div class="font-display text-5xl font-extrabold my-3 ${team.textClass} tracking-tight">
+                        ${team.score}
+                    </div>
+                    <p class="text-xs text-slate-400">Total Points</p>
+                </div>
+
+                ${isAdmin ? `
+                    <!-- Admin Quick Controls -->
+                    <div class="mt-4 pt-4 border-t border-slate-800/80 grid grid-cols-4 gap-1.5">
+                        <button class="add-pt-btn bg-slate-800 hover:bg-emerald-600/30 hover:border-emerald-500/50 border border-slate-700 text-emerald-400 text-xs font-bold py-1.5 rounded-lg transition-all" data-id="${team.id}" data-val="5">+5</button>
+                        <button class="add-pt-btn bg-slate-800 hover:bg-emerald-600/30 hover:border-emerald-500/50 border border-slate-700 text-emerald-400 text-xs font-bold py-1.5 rounded-lg transition-all" data-id="${team.id}" data-val="10">+10</button>
+                        <button class="add-pt-btn bg-slate-800 hover:bg-rose-600/30 hover:border-rose-500/50 border border-slate-700 text-rose-400 text-xs font-bold py-1.5 rounded-lg transition-all" data-id="${team.id}" data-val="-5">-5</button>
+                        <button class="custom-pt-btn bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold py-1.5 rounded-lg transition-all" data-id="${team.id}">Custom</button>
+                    </div>
+                ` : ''}
+            `;
+
+            return card;
+        }
+
+        function renderLogs() {
+            const logs = localState.logs || [];
+            document.getElementById('log-count').innerText = `${logs.length} events`;
+
+            if (logs.length === 0) {
+                activityLogContainer.innerHTML = `
+                    <div class="text-center py-12 text-slate-500 text-sm">
+                        <i class="fa-solid fa-clock-rotate-left text-2xl mb-2"></i>
+                        <p>No activity recorded yet!</p>
+                    </div>`;
+                return;
+            }
+
+            activityLogContainer.innerHTML = logs.slice().reverse().map(log => {
+                const isPositive = log.points >= 0;
+                const sign = isPositive ? '+' : '';
+                const badgeColor = isPositive 
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+
+                return `
+                    <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 flex items-center justify-between text-sm hover:border-slate-700 transition-colors">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs px-2 py-1 rounded-lg border ${badgeColor} font-bold font-mono">
+                                ${sign}${log.points}
+                            </span>
+                            <div>
+                                <span class="font-bold text-slate-200">${log.teamName}</span>
+                                <span class="text-slate-400 text-xs block sm:inline sm:ml-1">— ${log.text}</span>
+                            </div>
+                        </div>
+                        <span class="text-[11px] text-slate-500 whitespace-nowrap ml-2">${log.time}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function commitState(newTeams, newLogEntry) {
+            const updatedLogs = [...(localState.logs || []), newLogEntry];
+            const updatedState = {
+                ...localState,
+                teams: newTeams,
+                logs: updatedLogs
+            };
+
+            if (db) {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'scoreboard', 'main');
+                    await setDoc(docRef, updatedState);
+                } catch (e) {
+                    console.error("Failed to commit state to Firestore:", e);
+                    showToast("Failed to sync change online", "error");
+                }
+            } else {
+                updateLocalState(updatedState);
+            }
+        }
+
+        async function adjustPoints(teamId, delta, reason) {
+            const team = localState.teams.find(t => t.id === teamId);
+            if (!team) return;
+
+            const updatedTeams = localState.teams.map(t => {
+                if (t.id === teamId) {
+                    return { ...t, score: Math.max(0, t.score + delta) };
+                }
+                return t;
+            });
+
+            const logEntry = {
+                id: Date.now(),
+                teamName: team.name,
+                points: delta,
+                text: reason,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+
+            await commitState(updatedTeams, logEntry);
+            showToast(`${delta >= 0 ? '+' : ''}${delta} pts to ${team.name}`);
+        }
+
+        adminToggleBtn.addEventListener('click', () => {
+            if (isAdmin) {
+                // Logout Admin Mode
+                isAdmin = false;
+                adminBtnText.innerText = "Admin Access";
+                adminIndicator.classList.add('hidden');
+                document.getElementById('quick-bonus-panel').classList.add('hidden');
+                renderApp();
+                showToast("Logged out of Admin Mode");
+            } else {
+                // Open PIN Modal
+                document.getElementById('passcode-modal').classList.remove('hidden');
+                document.getElementById('passcode-input').focus();
+            }
+        });
+
+        document.getElementById('close-passcode-modal').addEventListener('click', () => {
+            document.getElementById('passcode-modal').classList.add('hidden');
+        });
+
+        document.getElementById('passcode-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const pin = document.getElementById('passcode-input').value;
+            if (pin === ADMIN_PIN) {
+                isAdmin = true;
+                adminBtnText.innerText = "Exit Admin";
+                adminIndicator.classList.remove('hidden');
+                document.getElementById('quick-bonus-panel').classList.remove('hidden');
+                document.getElementById('passcode-modal').classList.add('hidden');
+                document.getElementById('passcode-input').value = '';
+                document.getElementById('passcode-error').classList.add('hidden');
+                renderApp();
+                showToast("Admin Mode Unlocked!");
+            } else {
+                document.getElementById('passcode-error').classList.remove('hidden');
+            }
+        });
+
+        // Quick Bonus Form
+        document.getElementById('bonus-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const teamId = bonusTeamSelect.value;
+            const points = parseInt(document.getElementById('bonus-points').value, 10);
+            const reason = document.getElementById('bonus-reason').value;
+
+            if (isNaN(points)) return;
+
+            await adjustPoints(teamId, points, reason);
+            document.getElementById('bonus-points').value = '';
+            document.getElementById('bonus-reason').value = '';
+        });
+
+        // Event Delegation for Dynamic Team Buttons
+        teamsContainer.addEventListener('click', (e) => {
+            const addBtn = e.target.closest('.add-pt-btn');
+            const customBtn = e.target.closest('.custom-pt-btn');
+            const renameBtn = e.target.closest('.rename-team-btn');
+
+            if (addBtn) {
+                const teamId = addBtn.dataset.id;
+                const val = parseInt(addBtn.dataset.val, 10);
+                adjustPoints(teamId, val, val > 0 ? "Quick Bonus" : "Adjustment");
+            }
+
+            if (customBtn) {
+                const teamId = customBtn.dataset.id;
+                const team = localState.teams.find(t => t.id === teamId);
+                document.getElementById('modal-team-id').value = teamId;
+                document.getElementById('point-modal-title').innerText = `Adjust ${team.name}`;
+                document.getElementById('custom-point-modal').classList.remove('hidden');
+            }
+
+            if (renameBtn) {
+                const teamId = renameBtn.dataset.id;
+                const team = localState.teams.find(t => t.id === teamId);
+                const newName = prompt("Enter new team name:", team.name);
+                if (newName && newName.trim() !== '') {
+                    const updatedTeams = localState.teams.map(t => t.id === teamId ? { ...t, name: newName.trim() } : t);
+                    commitState(updatedTeams, {
+                        id: Date.now(),
+                        teamName: newName.trim(),
+                        points: 0,
+                        text: "Team renamed",
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    });
+                }
+            }
+        });
+
+        // Custom Point Modal Submit
+        document.getElementById('custom-point-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const teamId = document.getElementById('modal-team-id').value;
+            const delta = parseInt(document.getElementById('modal-points-delta').value, 10);
+            const reason = document.getElementById('modal-points-reason').value;
+
+            if (!isNaN(delta)) {
+                await adjustPoints(teamId, delta, reason);
+                document.getElementById('custom-point-modal').classList.add('hidden');
+                document.getElementById('modal-points-delta').value = '';
+                document.getElementById('modal-points-reason').value = '';
+            }
+        });
+
+        document.getElementById('close-point-modal').addEventListener('click', () => {
+            document.getElementById('custom-point-modal').classList.add('hidden');
+        });
+
+        // Rename Camp Title
+        document.getElementById('edit-camp-title-btn').addEventListener('click', () => {
+            document.getElementById('new-camp-title-input').value = localState.title;
+            document.getElementById('rename-camp-modal').classList.remove('hidden');
+        });
+
+        document.getElementById('close-rename-modal').addEventListener('click', () => {
+            document.getElementById('rename-camp-modal').classList.add('hidden');
+        });
+
+        document.getElementById('rename-camp-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newTitle = document.getElementById('new-camp-title-input').value.trim();
+            if (newTitle) {
+                const updatedState = { ...localState, title: newTitle };
+                if (db) {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'scoreboard', 'main');
+                    await setDoc(docRef, updatedState);
+                } else {
+                    updateLocalState(updatedState);
+                }
+                document.getElementById('rename-camp-modal').classList.add('hidden');
+                showToast("Camp title updated!");
+            }
+        });
+
+        function showToast(msg, type = "info") {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            toastMsg.innerText = msg;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function triggerConfetti() {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        // Initialize App on DOM Load
+        window.addEventListener('DOMContentLoaded', () => {
+            initFirebase();
+        });
+    </script>
+</body>
+</html>
